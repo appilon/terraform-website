@@ -16,7 +16,7 @@ When developing a provider it’s important that whatever the provider API repor
 
 ## Call READ after CREATE 
 
-At this point you should be familiar with fact that provider plugins are developed as CRUD operations with a function for each operation. The one when a new resource is being created is obviously the `CREATE` method. Here is a hypotethical config.
+At this point you should be familiar with fact that provider plugins are developed as CRUD operations with a function for each operation. The one when a new resource is being created is obviously the `CREATE` method. Here is a hypothetical config.
 
 ```hcl
 resource "simple_resource" "example" {
