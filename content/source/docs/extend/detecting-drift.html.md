@@ -10,13 +10,13 @@ description: |-
 
 # Detecting Drift
 
-One of the core challenges of infrastructure as code is keeping a consistent mapping of what you have deployed, terraform manages this in it’s state (which can be stored locally or remotely).
+One of the core challenges of infrastructure as code is keeping a consistent mapping of what you have deployed, Terraform manages this in it’s state (which can be stored locally or remotely).
 
-When developing a provider it’s important that whatever the provider API reports for a particular resource is consistently stored in terraform state, otherwise when terraform plan/apply is subsequently run it will detect change, this is what we refer to as Drift. When developing a new provider and resources, there are some common scenarios to handle to avoid Drift.
+When developing a provider it’s important that whatever the provider API reports for a particular resource is consistently stored in Terraform state, otherwise when Terraform plan/apply is subsequently run it will detect change, this is what we refer to as Drift. When developing a new provider and resources, there are some common scenarios to handle to avoid Drift.
 
 ## Call READ after CREATE 
 
-At this point you should be familiar with fact that provider plugins are developed as CRUD operations with a function for each operation. The one when a new resource is being created is obviously the `CREATE` method. Here is a hypothetical config.
+At this point you should be familiar with the fact that provider plugins are developed as CRUD operations with a function for each operation. The one when a new resource is being created is obviously the `CREATE` method. Here is a hypothetical config.
 
 ```hcl
 resource "simple_resource" "example" {
@@ -31,7 +31,7 @@ The associated provider code might look like this
 ```go
 func simpleResourceRead(d *schema.ResourceData, meta interface{}) error {
     client := meta.(*ProviderApi).client
-    resource, _ := client.GetResource(d.Get("name").(string))
+    resource, _ := client.GetResource(d.Id())
     d.Set("name", resource.Name)
     d.Set("type", resource.Type)
     return nil
@@ -39,17 +39,21 @@ func simpleResourceRead(d *schema.ResourceData, meta interface{}) error {
 
 func simpleResourceCreate(d *schema.ResourceData, meta interface{}) error {
     client := meta.(*ProviderApi).client
-    client.CreateResource(d.Get("name").(string))
+    name := d.Get("name").(string)
+    client.CreateResource(name)
+    d.SetId(name)
     return nil
 }
 ```
 
-The problem with this, is that our `CREATE` function does not synchronize the API state into the terraform state after creation. As mentioned in the config comment, the `type` is set to some default by the provider API if omitted on creation. Furthermore provider APIs can mutate values passed to them. Say the config contained capital letters in the values set, but the provider API converts all values to lowercase, again our terraform state is taking the user’s config as the source of truth, when in reality we should take the provider API as the source of truth. The common practice is to call `READ` at the end of `CREATE` or `UPDATE`, ensuring state is captured right away.
+The problem with this, is that our `CREATE` function does not synchronize the API state into the Terraform state after creation. As mentioned in the config comment, the `type` is set to some default by the provider API if omitted on creation. Furthermore provider APIs can mutate values passed to them. Say the config contained capital letters in the values set, but the provider API converts all values to lowercase, again our Terraform state is taking the user’s config as the source of truth, when in reality we should take the provider API as the source of truth. The common practice is to call `READ` at the end of `CREATE` or `UPDATE`, ensuring state is captured right away.
 
 ```go
 func simpleResourceCreate(d *schema.ResourceData, meta interface{}) error {
     client := meta.(*ProviderApi).client
-    client.CreateResource(d.Get("name").(string))
+    name := d.Get("name").(string)
+    client.CreateResource(name)
+    d.SetId(name)
     return simpleResourceRead(d, meta)
 }
 ```
@@ -74,17 +78,17 @@ It was hinted at above, but it is important that all attributes are set during t
  }
  ```
 
- Without error checking terraform will run successfully but with broken state. The same goes for error checking API calls.
+ Without error checking Terraform will run successfully but with broken state. The same goes for error checking API calls.
 
 ## Resources modified externally
 
-In production a common reason for drift is resources have been modified externally (say someone changed some values in a web dashboard). In this circumstance drift is expected, to reconcile this you could try importing the changed resources as a new resource, or updating your config to reflect the changes. Ultimately though it’s important that terraform be authoritative source of modifications and state.
+In production a common reason for drift is resources have been modified externally (say someone changed some values in a web dashboard). In this circumstance drift is expected, to reconcile this you could try importing the changed resource as a new resource, or updating your config to reflect the changes. Ultimately though it’s important that Terraform be the authoritative source of modifications and state.
 
 ## Handling Drift
 
-As mentioned, there are some situations where drift is okay. For instance configuration that contains uppercase letters but the provider API downcases all data. This would cause constant a diff, a situation like is is easily resolved with the help of some of the [schema functions][0].
+As mentioned, there are some situations where drift is okay. For instance configuration that contains uppercase letters but the provider API downcases all data. This would cause a constant diff, a situation like this is easily resolved with the help of some of the [schema functions][0].
 
-When operating infrastructure, to help keep terraform the source of truth on the state of provisioned resources, [this article][1] describes a way terraform itself can be used to automatically detect drift.
+When operating infrastructure, to help keep Terraform the source of truth on the state of provisioned resources, [this article][1] describes a way Terraform itself can be used to automatically detect drift.
 
 [0]: https://www.terraform.io/docs/extend/schemas/schema-behaviors.html#function-behaviors
 [1]: https://medium.com/build-acl/state-drift-detection-using-terraform-d0383628d2ea
